@@ -31,7 +31,11 @@ Requires Node.js ≥ 18.18 and the `pi` CLI. Then:
 
 ```bash
 pi install npm:codex-plugin-pi
-# or from git:
+```
+
+Or install straight from git (e.g. for a specific ref):
+
+```bash
 pi install git:github.com/imBlanker/codex-plugin-pi
 ```
 
