@@ -1,10 +1,17 @@
 {
   "name": "codex-plugin-pi",
   "version": "0.1.0",
-  "private": true,
-  "type": "module",
   "description": "Use Codex from the Pi coding agent to review code or delegate tasks.",
   "license": "Apache-2.0",
+  "author": "imBlanker",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imBlanker/codex-plugin-pi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imBlanker/codex-plugin-pi/issues"
+  },
+  "homepage": "https://github.com/imBlanker/codex-plugin-pi#readme",
   "keywords": [
     "pi-package",
     "codex",
@@ -14,6 +21,20 @@
   "engines": {
     "node": ">=18.18.0"
   },
+  "type": "module",
+  "files": [
+    "extensions/",
+    "lib/",
+    "prompts/",
+    "skills/",
+    "schemas/",
+    "scripts/",
+    "LICENSE",
+    "NOTICE",
+    "PORTING.md",
+    "CHANGELOG.md",
+    "README.md"
+  ],
   "pi": {
     "extensions": ["./extensions"],
     "prompts": ["./prompts"],
