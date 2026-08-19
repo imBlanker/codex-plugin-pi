@@ -30,9 +30,13 @@ to Pi's extension model.
 Requires Node.js ≥ 18.18 and the `pi` CLI. Then:
 
 ```bash
-pi install npm:codex-plugin-pi
-# or from git:
 pi install git:github.com/imBlanker/codex-plugin-pi
+```
+
+Once the package is published to npm, the shorter form will also work:
+
+```bash
+pi install npm:codex-plugin-pi   # not yet available — pending npm publication
 ```
 
 Restart Pi (or `/reload`). The commands above become available, and the
