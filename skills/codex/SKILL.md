@@ -25,3 +25,11 @@ findings. If a job fails, include its error text and the log path.
 
 Setup problems (codex missing, not logged in) → tell the user to run
 `/codex-setup`.
+
+## Review gate (0.2.0)
+
+`/codex-gate on|off|status|learner` toggles the full-lifecycle gate. When on:
+- Present plans before executing; the user (or you) runs `gate plan` — FAIL loops back.
+- Long-running command output is followed automatically; a realtime FAIL aborts the chain and asks for a reorganized plan.
+- Commit-like commands are blocked until `gate completion --diff` PASSes.
+Budgets/effort come from the OS-global learner shared with the dsh/cc plugins.

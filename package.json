@@ -1,6 +1,6 @@
 {
   "name": "codex-plugin-pi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Use Codex from the Pi coding agent to review code or delegate tasks.",
   "license": "Apache-2.0",
   "author": "imBlanker",
@@ -36,9 +36,15 @@
     "README.md"
   ],
   "pi": {
-    "extensions": ["./extensions"],
-    "prompts": ["./prompts"],
-    "skills": ["./skills"]
+    "extensions": [
+      "./extensions"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "skills": [
+      "./skills"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"

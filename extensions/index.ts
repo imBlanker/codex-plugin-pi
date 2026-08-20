@@ -439,6 +439,127 @@ export default function codexPluginPi(pi: ExtensionAPI) {
   jsonJobTool("codex_job_result", "result", "Codex job result (JSON)", "job id");
   jsonJobTool("codex_job_cancel", "cancel", "Cancel a Codex job (JSON)", "job id");
 
+  /* ---- full-lifecycle review gate (family 0.2.0) ---- */
+
+  const COMMIT_RE = /\b(git\s+(commit|push|merge|rebase|tag)|npm\s+publish|gh\s+(pr\s+merge|release\s+create))\b/;
+  let gateBusy = false; // re-entrancy guard: our own tool_call blocks must not loop
+
+  function gateEnabled(ctx: Ctx): boolean {
+    const r = runCompanionSync(ctx, ["gate", "status", "--json"]);
+    try {
+      return JSON.parse(r.stdout).gate === true;
+    } catch {
+      return false;
+    }
+  }
+
+  pi.registerCommand("codex-gate", {
+    description: "Codex review gate: on|off|status|learner — plan/realtime/completion gating",
+    getArgumentCompletions: (prefix: string) => {
+      const opts = ["on", "off", "status", "learner status"];
+      const hits = opts.filter((o) => o.startsWith(prefix)).map((o) => ({ value: o, label: o }));
+      return hits.length > 0 ? hits : null;
+    },
+    handler: async (args: string, ctx: Ctx) => {
+      const [action, ...rest] = (args ?? "").trim().split(/\s+/);
+      if (action === "learner") {
+        const r = runCompanionSync(ctx, ["gate", "learner", ...(rest.length ? rest : ["status"])]);
+        displayMessage(pi, "codex-gate", r.stdout.trim() || r.stderr.trim());
+        return;
+      }
+      if (action === "on" || action === "off" || !action || action === "status") {
+        const r = runCompanionSync(ctx, ["gate", action === "on" || action === "off" ? action : "status"]);
+        displayMessage(pi, "codex-gate", r.stdout.trim() || r.stderr.trim());
+        notify(ctx, `Review gate ${action === "on" ? "enabled" : action === "off" ? "disabled" : "status shown"}`, "info");
+        return;
+      }
+      notify(ctx, "Usage: /codex-gate on|off|status|learner [status]", "warning");
+    }
+  });
+
+  // Stage 3 enforcement: block commit-like tool calls until a fresh completion PASS.
+  pi.on("tool_call", async (event: any, ctx: Ctx) => {
+    if (gateBusy) return; // our own follow-up actions
+    if (event?.toolName !== "bash" && event?.toolName !== "mcp__*__bash") return;
+    const command = String(event?.input?.command ?? "");
+    if (!COMMIT_RE.test(command)) return;
+    let enabled = false;
+    try {
+      enabled = gateEnabled(ctx);
+    } catch {
+      return; // gate infra down → don't block work
+    }
+    if (!enabled) return;
+    const r = runCompanionSync(ctx, ["gate", "status", "--json"]);
+    let passAt: number | null = null;
+    try {
+      passAt = JSON.parse(r.stdout).completionPassAt ?? null;
+    } catch {
+      /* blocked below */
+    }
+    const fresh = typeof passAt === "number" && Date.now() - passAt < 30 * 60_000;
+    if (fresh) return;
+    return {
+      block: true,
+      reason:
+        "Codex review gate: commit-like command blocked. Run /codex-gate flow — `gate completion --diff` PASS required first (see /codex-gate status), or disable with /codex-gate off."
+    };
+  });
+
+  // Stage 2: realtime follow on long-running bash output (segment batching).
+  const followBuffers = new Map<string, { text: string; since: number }>();
+  pi.on("tool_execution_update", async (event: any, ctx: Ctx) => {
+    if (gateBusy) return;
+    const id = String(event?.toolCallId ?? "");
+    if (!id) return;
+    const chunk = String(event?.partialResult?.content?.map((c: any) => c?.text ?? "").join("") ?? "");
+    if (!chunk) return;
+    const buf = followBuffers.get(id) ?? { text: "", since: Date.now() };
+    buf.text = chunk; // partialResult is cumulative
+    followBuffers.set(id, buf);
+    const big = buf.text.length >= 2048;
+    const old = Date.now() - buf.since >= 5000;
+    if (!big && !old) return;
+    buf.since = Date.now();
+    const segment = buf.text.slice(-8000);
+    let enabled = false;
+    try {
+      enabled = gateEnabled(ctx);
+    } catch {
+      return;
+    }
+    if (!enabled) return;
+    gateBusy = true;
+    try {
+      const rr = await runCompanionAsync(ctx, ["gate", "follow", "--segment-text", segment, "--json", "--budget-ms", "25000"]);
+      const envelope = JSON.parse(rr.stdout || "{}");
+      if (envelope.verdict === "fail") {
+        notify(ctx, `Codex gate: realtime FAIL — ${envelope.deviation_summary ?? "deviation"}`, "error");
+        try {
+          ctx.abort?.();
+          pi.sendMessage(
+            {
+              customType: "codex-gate-halt",
+              content: `Codex realtime gate FAIL. Deviation: ${envelope.deviation_summary ?? "major deviation"}\nReasons:\n${(envelope.reasons ?? []).map((x: string) => `- ${x}`).join("\n")}\n\nHalt the current operation chain and reorganize the task solution (new plan, then /codex-gate plan).`,
+              display: true
+            },
+            { deliverAs: "steer" }
+          );
+        } catch {
+          /* non-fatal */
+        }
+      }
+    } catch {
+      /* gate infra failure → fail-open */
+    } finally {
+      gateBusy = false;
+    }
+  });
+  pi.on("tool_execution_end", async (_event: any, _ctx: Ctx) => {
+    // per-op buffer cleanup happens lazily; cap map size
+    if (followBuffers.size > 32) followBuffers.clear();
+  });
+
   /* ---- background completion poller ---- */
 
   async function pollJobs(ctx: Ctx) {
