@@ -381,7 +381,10 @@ export default function codexPluginPi(pi: ExtensionAPI) {
       if (params?.base) args.push("--base", String(params.base));
       if (params?.scope) args.push("--scope", String(params.scope));
       const r = await runCompanionAsync({ cwd: process.cwd() }, args, (line) =>
-        onUpdate({ text: line })
+        // Partial ToolResult shape — pi's onUpdate expects `content`, and
+        // `{ text }` crashed the TUI renderer (result.content.filter on
+        // undefined) whenever the companion wrote to stderr. Issue #3.
+        onUpdate({ content: [{ type: "text", text: line }] })
       );
       return {
         content: [{ type: "text", text: r.stdout.trim() || r.stderr.trim() || "(no output)" }],

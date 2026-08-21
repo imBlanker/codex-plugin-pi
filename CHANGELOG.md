@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1 (2026-08-21)
+
+- **Fix: `codex_review` crashed the pi TUI when the companion wrote to stderr**
+  (issue #3). The streaming callback emitted `onUpdate({ text })`, which is
+  not a partial `ToolResult`; pi 0.84.2's renderer guards `result` but not
+  `result.content` (`render-utils.js` `result.content.filter` on `undefined`)
+  → uncaught `TypeError` → TUI exit mid-review, losing the result. Now emits
+  `onUpdate({ content: [{ type: "text", text: line }] })` — the same shape
+  the plugin's own gate handler reads (`partialResult?.content`). Side
+  benefit: stderr progress lines now actually render in the tool result card
+  (the renderer only ever looked at `content`). Source-contract regression
+  test added (`tests/partial-update.test.mjs`). (pi-side renderer hardening
+  belongs upstream: badlogic/pi-mono.)
+
 ## 0.2.0 (2026-08-20) — full-lifecycle review gate (family lockstep)
 
 - Gate family core vendored to `lib/gate/` (byte-identical with
