@@ -1,6 +1,6 @@
 {
   "name": "codex-plugin-pi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Use Codex from the Pi coding agent to review code or delegate tasks.",
   "license": "Apache-2.0",
   "author": "imBlanker",
